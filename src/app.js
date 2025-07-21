@@ -3,6 +3,7 @@ const connectDB = require('./config/database');
 const User = require("./models/user");
 const app = express();
 
+
 app.use(express.json());
 
 //POST /users
@@ -60,18 +61,34 @@ app.delete("/user", async (req,res)=>{
     }
 });
 
-app.patch("/user",async (req,res)=>{
-    const userId = req.body.userId;
+//UPDATE USING PATCH 
+app.patch("/user/:userId",async (req,res)=>{
+    const userId = req.params?.userId;
     const data = req.body;
+    
      try{
-        const user = await User.findByIdAndUpdate({_id:userId},data);
-            console.log("before",user);
-            res.send("User updated successfully");
-            console.log("after",user);
-    }catch{
-        res.status(400).send("Something went wrong");
-    }
+         const ALLOWED_UPDATES = ["photoUrl", "about", "gender", "skills", "age"];
 
+        const isUpdateAllowed = Object.keys(data).every((k) => ALLOWED_UPDATES.includes(k));
+
+        if(!isUpdateAllowed){
+            throw new Error("Update is not allowed");
+
+        }
+
+        if(data?.skills.length > 10){
+            throw new Error("Skills cannot be more than 10");
+        }
+
+        const user = await User.findByIdAndUpdate({_id:userId},data,{
+            returnDocument : "after",
+            runValidators : true,
+        });
+         console.log(user);
+            res.send("User updated successfully");    
+    }catch(err){
+        res.status(400).send("Update is failed"+err.message);
+    }
 });
 
 
