@@ -1,22 +1,72 @@
 const express = require('express');
 const connectDB = require('./config/database');
 const User = require("./models/user");
+const bcrypt = require("bcrypt");
 const app = express();
+const { validateSignupData } = require('./utils/validation');
 
 
 app.use(express.json());
 
 //POST /users
 app.post("/signup", async (req,res)=>{
-    // creating a new instance of the User Model
-    const user = new User(req.body);
+
     try{
-        // saving the user to the database
+         // Validate the signup data
+        validateSignupData(req);
+
+        const {firstName, lastName, emailId ,password} = req.body;
+        
+        //Encrypt the password
+        
+        const passwordHash = await bcrypt.hash(password, 10);
+        console.log("Password Hash:", passwordHash);        
+
+        // creating a new instance of the User Model
+        const user = new User({
+            firstName,
+            lastName,
+            emailId,
+            password: passwordHash,
+        });
+
+
+        // Save the user to the database
         await user.save();
         res.status(201).json({message: "User created successfully"}); 
-    
-    }catch{
-        res.status(400).send({message:"Failed to create user"});
+    }
+   
+   catch(err){
+        res.status(400).send("ERROR: " + err.message);
+    }
+});
+
+app.post("/login", async (req,res) => {
+    try {
+        const { emailId, password } = req.body;
+
+        // Find the user by email
+        const user = await User.findOne({ emailId: emailId });
+        if (!user) {
+            throw new Error("Invalid credentials");
+        }
+        // Compare the password with the hashed password in the database
+        // bcrypt.compare returns a promise that resolves to true or false
+
+
+        // const isPasswordValid = await bcrypt.compare(password, user.password);  //NOT WORKING
+
+        const isPasswordValid = bcrypt.compare(password, user.password);//WORKING 
+
+        // Validate the login data
+        if (isPasswordValid) {
+            res.send("Login successful");
+        } else {
+            throw new Error("Invalid credentials");
+        }
+
+    }catch (err) {
+        res.status(400).send("ERROR: " + err.message);
     }
 });
 
