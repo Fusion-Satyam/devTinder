@@ -4,9 +4,13 @@ const User = require("./models/user");
 const bcrypt = require("bcrypt");
 const app = express();
 const { validateSignupData } = require('./utils/validation');
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
+const { userAuth } = require('./middleware/auth');
 
 
 app.use(express.json());
+app.use(cookieParser());
 
 //POST /users
 app.post("/signup", async (req,res)=>{
@@ -41,26 +45,28 @@ app.post("/signup", async (req,res)=>{
     }
 });
 
+//POST /login
 app.post("/login", async (req,res) => {
     try {
         const { emailId, password } = req.body;
-
         // Find the user by email
         const user = await User.findOne({ emailId: emailId });
         if (!user) {
             throw new Error("Invalid credentials");
         }
         // Compare the password with the hashed password in the database
-        // bcrypt.compare returns a promise that resolves to true or false
 
-
-        // const isPasswordValid = await bcrypt.compare(password, user.password);  //NOT WORKING
-
-        const isPasswordValid = bcrypt.compare(password, user.password);//WORKING 
-
-        // Validate the login data
+        const isPasswordValid = await user.validatePassword(password);
+        
         if (isPasswordValid) {
+            
+            const token = await user.getJWT();  
+
+            // Set the token in a cookie
+            res.cookie("token", token,{expires: new Date(Date.now() + 8*3600000)
+            });
             res.send("Login successful");
+
         } else {
             throw new Error("Invalid credentials");
         }
@@ -69,6 +75,23 @@ app.post("/login", async (req,res) => {
         res.status(400).send("ERROR: " + err.message);
     }
 });
+ 
+
+
+//GET PROFILE
+app.get("/profile", userAuth , async (req, res) => {
+
+try {
+    
+    const user = req.user; // Assuming user is set in the auth middleware
+    res.send(user); 
+
+}catch(err) {
+        res.status(400).send("ERROR: " + err.message);
+    }
+
+});
+
 
 //GET USER  BY EMAIL ID
 app.get("/user", async(req,res)=>{
