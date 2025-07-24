@@ -3,7 +3,7 @@ const connectDB = require('./config/database');
 const User = require("./models/user");
 const bcrypt = require("bcrypt");
 const app = express();
-const { validateSignupData } = require('./utils/validation');
+
 const cookieParser = require('cookie-parser');
 const jwt = require('jsonwebtoken');
 const { userAuth } = require('./middleware/auth');
@@ -12,86 +12,17 @@ const { userAuth } = require('./middleware/auth');
 app.use(express.json());
 app.use(cookieParser());
 
-//POST /users
-app.post("/signup", async (req,res)=>{
+const authRouter = require("./routes/auth");
+const profileRouter = require("./routes/profile");
+const requestRouter = require("./routes/request");
 
-    try{
-         // Validate the signup data
-        validateSignupData(req);
-
-        const {firstName, lastName, emailId ,password} = req.body;
-        
-        //Encrypt the password
-        
-        const passwordHash = await bcrypt.hash(password, 10);
-        console.log("Password Hash:", passwordHash);        
-
-        // creating a new instance of the User Model
-        const user = new User({
-            firstName,
-            lastName,
-            emailId,
-            password: passwordHash,
-        });
+app.use("/", authRouter);
+app.use("/", profileRouter);
+app.use("/", requestRouter);
 
 
-        // Save the user to the database
-        await user.save();
-        res.status(201).json({message: "User created successfully"}); 
-    }
-   
-   catch(err){
-        res.status(400).send("ERROR: " + err.message);
-    }
-});
 
-//POST /login
-app.post("/login", async (req,res) => {
-    try {
-        const { emailId, password } = req.body;
-        // Find the user by email
-        const user = await User.findOne({ emailId: emailId });
-        if (!user) {
-            throw new Error("Invalid credentials");
-        }
-        // Compare the password with the hashed password in the database
-
-        const isPasswordValid = await user.validatePassword(password);
-        
-        if (isPasswordValid) {
-            
-            const token = await user.getJWT();  
-
-            // Set the token in a cookie
-            res.cookie("token", token,{expires: new Date(Date.now() + 8*3600000)
-            });
-            res.send("Login successful");
-
-        } else {
-            throw new Error("Invalid credentials");
-        }
-
-    }catch (err) {
-        res.status(400).send("ERROR: " + err.message);
-    }
-});
  
-
-
-//GET PROFILE
-app.get("/profile", userAuth , async (req, res) => {
-
-try {
-    
-    const user = req.user; // Assuming user is set in the auth middleware
-    res.send(user); 
-
-}catch(err) {
-        res.status(400).send("ERROR: " + err.message);
-    }
-
-});
-
 
 //GET USER  BY EMAIL ID
 app.get("/user", async(req,res)=>{
@@ -111,6 +42,7 @@ app.get("/user", async(req,res)=>{
     }
 });
 
+
 //GET FEED (ALL USERS)
 app.get("/feed",async (req,res)=>{
     try{
@@ -123,6 +55,7 @@ app.get("/feed",async (req,res)=>{
     }
 });
 
+
 //DELETE USER BY ID
 app.delete("/user", async (req,res)=>{
      const userId = req.body.userId;
@@ -133,6 +66,7 @@ app.delete("/user", async (req,res)=>{
         res.status(400).send("Something went wrong");
     }
 });
+
 
 //UPDATE USING PATCH 
 app.patch("/user/:userId",async (req,res)=>{
@@ -163,6 +97,7 @@ app.patch("/user/:userId",async (req,res)=>{
         res.status(400).send("Update is failed"+err.message);
     }
 });
+
 
 
 connectDB().then(()=>{
